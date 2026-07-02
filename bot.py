@@ -1848,12 +1848,12 @@ def handle_youtube_shorts_audio_callback(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('pg_'))
 def handle_pagination_callback(call):
+    lang = get_user_lang(call.message.chat.id)
     prefix, rest = call.data.split('_', 1)
     shortcode, page_str = rest.rsplit('_', 1)
     page = int(page_str)
 
     if shortcode not in SEARCH_CACHE:
-        lang = get_user_lang(call.message.chat.id)
         bot.answer_callback_query(call.id, TRANSLATIONS[lang]['search_expired'], show_alert=True)
         return
 
@@ -2172,8 +2172,30 @@ def periodic_cleanup():
             print(f"Error during periodic cleanup: {e}")
         time.sleep(1800)  # run every 30 minutes
 
+def start_dummy_server():
+    import http.server
+    import socketserver
+    
+    class DummyHandler(http.server.SimpleHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"Bot is alive!")
+            
+    port = int(os.environ.get("PORT", 8080))
+    socketserver.TCPServer.allow_reuse_address = True
+    try:
+        with socketserver.TCPServer(("", port), DummyHandler) as httpd:
+            print(f"Dummy HTTP server started on port {port}")
+            httpd.serve_forever()
+    except Exception as e:
+        print(f"Error starting dummy HTTP server: {e}")
+
 if __name__ == '__main__':
     init_user_db()
+    # Start dummy HTTP server for Render free tier compatibility
+    threading.Thread(target=start_dummy_server, daemon=True, name="web-server").start()
     cleanup_old_downloads()
     try:
         bot.set_my_commands([
