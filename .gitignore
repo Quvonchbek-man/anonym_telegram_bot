@@ -1,0 +1,9 @@
+.env
+user_settings.db
+cookies.txt
+temp_downloads/
+__pycache__/
+*.pyc
+*.log
+.agents/
+.gemini/
