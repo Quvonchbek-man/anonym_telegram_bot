@@ -7,3 +7,9 @@ __pycache__/
 *.log
 .agents/
 .gemini/
+*.db
+*.sqlite3
+bot.py
+demo.py
+math_bot.py
+translations.py
