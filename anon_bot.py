@@ -27,8 +27,9 @@ if admin_ids_str:
     except ValueError as e:
         print(f"Error parsing ADMIN_IDS: {e}")
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_FILE = os.path.join(BASE_DIR, "anon_qa_bot.db")
 bot = telebot.TeleBot(TOKEN)
-DB_FILE = "anon_qa_bot.db"
 
 class ThreadSafeDict(dict):
     def __init__(self, *args, **kwargs):
@@ -701,6 +702,10 @@ def handle_ban_command(message):
     if not target_info:
         bot.reply_to(message, f"Foydalanuvchi topilmadi ({target_id}).")
         return
+
+    if target_id == SUPER_ADMIN_ID:
+        bot.reply_to(message, "Bosh adminni (Owner) bloklash taqiqlangan! ❌")
+        return
         
     if ban_user(target_id, chat_id, reason):
         try:
@@ -789,45 +794,53 @@ def handle_addadmin_command(message):
         
     params = message.text.split()
     if len(params) < 2:
-        bot.reply_to(message, "Foydalanish: /addadmin <chat_id>")
+        bot.reply_to(message, "Foydalanish: /addadmin <chat_id yoki @username>")
         return
         
     try:
         target_id = int(params[1])
         target_info = get_user(target_id)
-        if not target_info:
-            bot.reply_to(message, f"Foydalanuvchi topilmadi ({target_id}). Avval botga /start bosgan bo'lishi kerak.")
-            return
-            
-        conn = get_db_connection()
-        try:
-            cursor = conn.cursor()
-            cursor.execute("UPDATE users SET is_admin = 1 WHERE chat_id = ?", (target_id,))
-            conn.commit()
-        finally:
-            conn.close()
-        
-        try:
-            bot.set_my_commands([
-                telebot.types.BotCommand("start", "Botni ishga tushirish / Havola"),
-                telebot.types.BotCommand("help", "Yordam va ma'lumotlar"),
-                telebot.types.BotCommand("adminpage", "Admin boshqaruv paneli")
-            ], scope=telebot.types.BotCommandScopeChat(target_id))
-        except Exception as e:
-            print(f"Error setting custom commands for new admin {target_id}: {e}")
-            
-        try:
-            bot.send_message(
-                target_id, 
-                "Siz ushbu botga administrator etib tayinlandingiz! 💻\n"
-                "Buyruqlar menyusini tekshiring yoki /adminpage ni yozing."
-            )
-        except Exception:
-            pass
-            
-        bot.reply_to(message, f"Foydalanuvchi {target_id} ({target_info['username'] or 'No Name'}) muvaffaqiyatli admin qilindi.")
     except ValueError:
-        bot.reply_to(message, "Foydalanuvchi ID raqam bo'lishi kerak. Foydalanish: /addadmin <chat_id>")
+        username_arg = params[1]
+        target_info = get_user_by_username(username_arg)
+        if target_info:
+            target_id = target_info['chat_id']
+        else:
+            bot.reply_to(message, f"Foydalanuvchi topilmadi ({username_arg}). Foydalanish: /addadmin <chat_id yoki @username>")
+            return
+
+    if not target_info:
+        bot.reply_to(message, f"Foydalanuvchi topilmadi ({target_id}). Avval botga /start bosgan bo'lishi kerak.")
+        return
+        
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET is_admin = 1 WHERE chat_id = ?", (target_id,))
+        conn.commit()
+    finally:
+        conn.close()
+    
+    try:
+        bot.set_my_commands([
+            telebot.types.BotCommand("start", "Botni ishga tushirish / Havola"),
+            telebot.types.BotCommand("help", "Yordam va ma'lumotlar"),
+            telebot.types.BotCommand("adminpage", "Admin boshqaruv paneli")
+        ], scope=telebot.types.BotCommandScopeChat(target_id))
+    except Exception as e:
+        print(f"Error setting custom commands for new admin {target_id}: {e}")
+        
+    try:
+        bot.send_message(
+            target_id, 
+            "Siz ushbu botga administrator etib tayinlandingiz! 💻\n"
+            "Buyruqlar menyusini tekshiring yoki /adminpage ni yozing."
+        )
+    except Exception:
+        pass
+        
+    username_display = target_info['username'] or 'No Name'
+    bot.reply_to(message, f"Foydalanuvchi {target_id} ({username_display}) muvaffaqiyatli admin qilindi.")
     except Exception as e:
         print(f"Error adding admin: {e}")
         bot.reply_to(message, "Xatolik yuz berdi.")
@@ -840,41 +853,49 @@ def handle_deladmin_command(message):
         
     params = message.text.split()
     if len(params) < 2:
-        bot.reply_to(message, "Foydalanish: /deladmin <chat_id>")
+        bot.reply_to(message, "Foydalanish: /deladmin <chat_id yoki @username>")
         return
         
     try:
         target_id = int(params[1])
-        if target_id == SUPER_ADMIN_ID:
-            bot.reply_to(message, "Bosh adminni vazifasidan bo'shatib bo'lmaydi!")
-            return
-            
         target_info = get_user(target_id)
-        if not target_info:
-            bot.reply_to(message, f"Foydalanuvchi topilmadi ({target_id}).")
-            return
-            
-        conn = get_db_connection()
-        try:
-            cursor = conn.cursor()
-            cursor.execute("UPDATE users SET is_admin = 0 WHERE chat_id = ?", (target_id,))
-            conn.commit()
-        finally:
-            conn.close()
-        
-        try:
-            bot.delete_my_commands(scope=telebot.types.BotCommandScopeChat(target_id))
-        except Exception as e:
-            print(f"Error deleting custom commands for {target_id}: {e}")
-            
-        try:
-            bot.send_message(target_id, "Sizning administratorlik huquqlaringiz bekor qilindi ❌")
-        except Exception:
-            pass
-            
-        bot.reply_to(message, f"Foydalanuvchi {target_id} adminlikdan olib tashlandi.")
     except ValueError:
-        bot.reply_to(message, "Foydalanuvchi ID raqam bo'lishi kerak. Foydalanish: /deladmin <chat_id>")
+        username_arg = params[1]
+        target_info = get_user_by_username(username_arg)
+        if target_info:
+            target_id = target_info['chat_id']
+        else:
+            bot.reply_to(message, f"Foydalanuvchi topilmadi ({username_arg}). Foydalanish: /deladmin <chat_id yoki @username>")
+            return
+
+    if not target_info:
+        bot.reply_to(message, f"Foydalanuvchi topilmadi ({target_id}).")
+        return
+        
+    if target_id == SUPER_ADMIN_ID:
+        bot.reply_to(message, "Bosh adminni vazifasidan bo'shatib bo'lmaydi!")
+        return
+        
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET is_admin = 0 WHERE chat_id = ?", (target_id,))
+        conn.commit()
+    finally:
+        conn.close()
+    
+    try:
+        bot.delete_my_commands(scope=telebot.types.BotCommandScopeChat(target_id))
+    except Exception as e:
+        print(f"Error deleting custom commands for {target_id}: {e}")
+        
+    try:
+        bot.send_message(target_id, "Sizning administratorlik huquqlaringiz bekor qilindi ❌")
+    except Exception:
+        pass
+        
+    username_display = target_info['username'] or 'No Name'
+    bot.reply_to(message, f"Foydalanuvchi {target_id} ({username_display}) adminlikdan olib tashlandi.")
     except Exception as e:
         print(f"Error deleting admin: {e}")
         bot.reply_to(message, "Xatolik yuz berdi.")
@@ -900,8 +921,8 @@ def handle_adminpage_command(message):
     if is_super_admin(chat_id):
         text += (
             "\n\n👑 SUPER ADMIN BUYRUQLARI:\n"
-            "➕ /addadmin <chat_id> - Yangi admin qo'shish\n"
-            "➖ /deladmin <chat_id> - Adminlikdan bo'shatish"
+            "➕ /addadmin <chat_id yoki @username> - Yangi admin qo'shish\n"
+            "➖ /deladmin <chat_id yoki @username> - Adminlikdan bo'shatish"
         )
     bot.reply_to(message, text)
 
