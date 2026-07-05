@@ -1,8 +1,2 @@
 pyTelegramBotAPI
-yt-dlp
-shazamio
-pydub
-imageio-ffmpeg
-psycopg2-binary
 python-dotenv
-audioop-lts; python_version >= '3.13'

@@ -765,15 +765,18 @@ def handle_banned_list_command(message):
             bot.reply_to(message, "Hozircha bloklangan foydalanuvchilar yo'q. ✅")
             return
             
-        text = "🚫 **Bloklangan foydalanuvchilar ro'yxati:**\n\n"
+        import html
+        text = "🚫 <b>Bloklangan foydalanuvchilar ro'yxati:</b>\n\n"
         for idx, user in enumerate(banned_list, 1):
-            username_part = f" (@{user['username']})" if user['username'] else " (No Username)"
-            text += f"{idx}. ID: `{user['chat_id']}`{username_part}\n   Sabab: {user['reason']}\n   Vaqt: {user['timestamp']}\n\n"
+            username_val = html.escape(user['username']) if user['username'] else None
+            username_part = f" (@{username_val})" if username_val else " (No Username)"
+            reason_val = html.escape(user['reason']) if user['reason'] else "Belgilanmagan"
+            text += f"{idx}. ID: <code>{user['chat_id']}</code>{username_part}\n   Sabab: {reason_val}\n   Vaqt: {user['timestamp']}\n\n"
             
         if len(text) > 4000:
             text = text[:4000] + "\n... (ro'yxat juda uzun)"
             
-        bot.reply_to(message, text, parse_mode="Markdown")
+        bot.reply_to(message, text, parse_mode="HTML")
     except Exception as e:
         print(f"Error fetching banned users: {e}")
         bot.reply_to(message, "Xatolik yuz berdi.")
@@ -898,32 +901,9 @@ def handle_adminpage_command(message):
         text += (
             "\n\n👑 SUPER ADMIN BUYRUQLARI:\n"
             "➕ /addadmin <chat_id> - Yangi admin qo'shish\n"
-            "➖ /deladmin <chat_id> - Adminlikdan bo'shatish\n"
-            "📁 /backup - Ma'lumotlar bazasini yuklab olish"
+            "➖ /deladmin <chat_id> - Adminlikdan bo'shatish"
         )
     bot.reply_to(message, text)
-
-@bot.message_handler(commands=['backup'])
-def handle_backup_command(message):
-    chat_id = message.chat.id
-    if not is_super_admin(chat_id):
-        bot.reply_to(message, "Ushbu buyruq faqat Super Admin uchun ruxsat etilgan! ❗")
-        return
-        
-    try:
-        # Send DB file to the admin
-        if os.path.exists(DB_FILE):
-            with open(DB_FILE, 'rb') as f:
-                bot.send_document(
-                    chat_id, 
-                    f, 
-                    caption=f"📁 **Ma'lumotlar bazasi zaxira nusxasi (Backup)**\n⏰ Vaqti: {message.date}"
-                )
-        else:
-            bot.reply_to(message, "Ma'lumotlar bazasi fayli topilmadi.")
-    except Exception as e:
-        print(f"Error creating backup: {e}")
-        bot.reply_to(message, "Zaxira nusxa yaratishda xatolik yuz berdi.")
 
 @bot.message_handler(commands=['help'])
 def handle_help_command(message):
