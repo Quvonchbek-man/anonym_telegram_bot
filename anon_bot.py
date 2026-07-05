@@ -353,6 +353,19 @@ def get_user(chat_id):
     finally:
         conn.close()
 
+def get_user_by_username(username):
+    if not username:
+        return None
+    username_clean = username.lstrip('@')
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (username_clean,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
 def get_user_by_link_code(code):
     conn = get_db_connection()
     try:
@@ -653,28 +666,36 @@ def handle_ban_command(message):
         
     params = message.text.split(maxsplit=2)
     if len(params) < 2:
-        bot.reply_to(message, "Foydalanish: /ban <chat_id> [sabab]")
+        bot.reply_to(message, "Foydalanish: /ban <chat_id yoki @username> [sabab]")
         return
         
+    reason = params[2] if len(params) > 2 else "Belgilanmagan"
+    
     try:
         target_id = int(params[1])
-        reason = params[2] if len(params) > 2 else "Belgilanmagan"
-        
         target_info = get_user(target_id)
-        if not target_info:
-            bot.reply_to(message, f"Foydalanuvchi topilmadi ({target_id}).")
-            return
-            
-        if ban_user(target_id, chat_id, reason):
-            try:
-                bot.send_message(target_id, "Siz xavfsizlik qoidalarini buzganligingiz sababli botdan administrator tomonidan bloklandingiz ❌")
-            except Exception:
-                pass
-            bot.reply_to(message, f"Foydalanuvchi {target_id} ({target_info['username'] or 'No Name'}) muvaffaqiyatli global bloklandi. Sababi: {reason}")
-        else:
-            bot.reply_to(message, "Bloklashda xatolik yuz berdi.")
     except ValueError:
-        bot.reply_to(message, "Foydalanuvchi ID raqam bo'lishi kerak. Foydalanish: /ban <chat_id> [sabab]")
+        username_arg = params[1]
+        target_info = get_user_by_username(username_arg)
+        if target_info:
+            target_id = target_info['chat_id']
+        else:
+            bot.reply_to(message, f"Foydalanuvchi topilmadi ({username_arg}). Foydalanish: /ban <chat_id yoki @username> [sabab]")
+            return
+
+    if not target_info:
+        bot.reply_to(message, f"Foydalanuvchi topilmadi ({target_id}).")
+        return
+        
+    if ban_user(target_id, chat_id, reason):
+        try:
+            bot.send_message(target_id, "Siz xavfsizlik qoidalarini buzganligingiz sababli botdan administrator tomonidan bloklandingiz ❌")
+        except Exception:
+            pass
+        username_display = target_info['username'] or 'No Name'
+        bot.reply_to(message, f"Foydalanuvchi {target_id} ({username_display}) muvaffaqiyatli global bloklandi. Sababi: {reason}")
+    else:
+        bot.reply_to(message, "Bloklashda xatolik yuz berdi.")
 
 @bot.message_handler(commands=['unban'])
 def handle_unban_command(message):
@@ -684,25 +705,38 @@ def handle_unban_command(message):
         
     params = message.text.split()
     if len(params) < 2:
-        bot.reply_to(message, "Foydalanish: /unban <chat_id>")
+        bot.reply_to(message, "Foydalanish: /unban <chat_id yoki @username>")
         return
         
     try:
         target_id = int(params[1])
-        if not is_globally_banned(target_id):
-            bot.reply_to(message, "Ushbu foydalanuvchi bloklanmagan.")
-            return
-            
-        if unban_user(target_id):
-            try:
-                bot.send_message(target_id, "Sizning blokirovkangiz bekor qilindi. Botdan qayta foydalanishingiz mumkin ✅")
-            except Exception:
-                pass
-            bot.reply_to(message, f"Foydalanuvchi {target_id} blokdan chiqarildi.")
-        else:
-            bot.reply_to(message, "Blokdan chiqarishda xatolik yuz berdi.")
+        target_info = get_user(target_id)
     except ValueError:
-        bot.reply_to(message, "Foydalanuvchi ID raqam bo'lishi kerak. Foydalanish: /unban <chat_id>")
+        username_arg = params[1]
+        target_info = get_user_by_username(username_arg)
+        if target_info:
+            target_id = target_info['chat_id']
+        else:
+            bot.reply_to(message, f"Foydalanuvchi topilmadi ({username_arg}). Foydalanish: /unban <chat_id yoki @username>")
+            return
+
+    if not target_info:
+        bot.reply_to(message, f"Foydalanuvchi topilmadi ({target_id}).")
+        return
+        
+    if not is_globally_banned(target_id):
+        bot.reply_to(message, "Ushbu foydalanuvchi bloklanmagan.")
+        return
+        
+    if unban_user(target_id):
+        try:
+            bot.send_message(target_id, "Sizning blokirovkangiz bekor qilindi. Botdan qayta foydalanishingiz mumkin ✅")
+        except Exception:
+            pass
+        username_display = target_info['username'] or 'No Name'
+        bot.reply_to(message, f"Foydalanuvchi {target_id} ({username_display}) blokdan chiqarildi.")
+    else:
+        bot.reply_to(message, "Blokdan chiqarishda xatolik yuz berdi.")
 
 @bot.message_handler(commands=['addadmin'])
 def handle_addadmin_command(message):
@@ -815,8 +849,8 @@ def handle_adminpage_command(message):
         "🚨 /reports - Shikoyatlar ro'yxati (oxirgi 10 ta)\n"
         "📊 /stats - Bot a'zolari va faoliyat statistikasi\n"
         "📢 /broadcast - Barcha a'zolarga xabar tarqatish\n"
-        "🚫 /ban <chat_id> [sabab] - Foydalanuvchini bloklash\n"
-        "✅ /unban <chat_id> - Blokdan chiqarish\n"
+        "🚫 /ban <chat_id yoki @username> [sabab] - Foydalanuvchini bloklash\n"
+        "✅ /unban <chat_id yoki @username> - Blokdan chiqarish\n"
         "📝 /history <chat_id> - Foydalanuvchi suhbat jurnali"
     )
     if is_super_admin(chat_id):
