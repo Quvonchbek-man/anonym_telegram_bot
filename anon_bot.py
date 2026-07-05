@@ -232,6 +232,21 @@ def unban_user(chat_id):
     finally:
         conn.close()
 
+def get_banned_users():
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT bu.chat_id, bu.reason, bu.timestamp, u.username 
+            FROM banned_users bu
+            LEFT JOIN users u ON bu.chat_id = u.chat_id
+            ORDER BY bu.timestamp DESC
+        """)
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
 def add_report(reporter_id, reported_id, content, content_type):
     conn = get_db_connection()
     try:
@@ -738,6 +753,31 @@ def handle_unban_command(message):
     else:
         bot.reply_to(message, "Blokdan chiqarishda xatolik yuz berdi.")
 
+@bot.message_handler(commands=['banned', 'banlist'])
+def handle_banned_list_command(message):
+    chat_id = message.chat.id
+    if not is_admin(chat_id):
+        return
+        
+    try:
+        banned_list = get_banned_users()
+        if not banned_list:
+            bot.reply_to(message, "Hozircha bloklangan foydalanuvchilar yo'q. ✅")
+            return
+            
+        text = "🚫 **Bloklangan foydalanuvchilar ro'yxati:**\n\n"
+        for idx, user in enumerate(banned_list, 1):
+            username_part = f" (@{user['username']})" if user['username'] else " (No Username)"
+            text += f"{idx}. ID: `{user['chat_id']}`{username_part}\n   Sabab: {user['reason']}\n   Vaqt: {user['timestamp']}\n\n"
+            
+        if len(text) > 4000:
+            text = text[:4000] + "\n... (ro'yxat juda uzun)"
+            
+        bot.reply_to(message, text, parse_mode="Markdown")
+    except Exception as e:
+        print(f"Error fetching banned users: {e}")
+        bot.reply_to(message, "Xatolik yuz berdi.")
+
 @bot.message_handler(commands=['addadmin'])
 def handle_addadmin_command(message):
     chat_id = message.chat.id
@@ -851,6 +891,7 @@ def handle_adminpage_command(message):
         "📢 /broadcast - Barcha a'zolarga xabar tarqatish\n"
         "🚫 /ban <chat_id yoki @username> [sabab] - Foydalanuvchini bloklash\n"
         "✅ /unban <chat_id yoki @username> - Blokdan chiqarish\n"
+        "📜 /banned - Bloklanganlar ro'yxati\n"
         "📝 /history <chat_id> - Foydalanuvchi suhbat jurnali"
     )
     if is_super_admin(chat_id):
