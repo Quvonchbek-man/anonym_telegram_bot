@@ -1,0 +1,15 @@
+# Maxfiy sozlamalar
+.env
+
+# Ma'lumotlar bazasi
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+
+# Python
+__pycache__/
+*.pyc
+
+# Loglar
+*.log
