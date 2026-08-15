@@ -74,6 +74,11 @@ Baza (`anon_qa_bot.db`) birinchi ishga tushishda avtomatik yaratiladi.
 - Har bir qabul qiluvchi jo'natuvchini bloklashi mumkin — bloklangan odam unga boshqa yeta olmaydi va buni bilmaydi.
 - Global ban adminlar tomonidan qo'yiladi; oddiy admin boshqa adminni bloklay olmaydi.
 
+## Serverga joylash
+
+Systemd xizmati sifatida o'rnatish va yangilash: [deploy/SERVER.md](deploy/SERVER.md).
+Bot faqat chiquvchi ulanish qiladi (polling) — port ochish, domen yoki HTTPS kerak emas.
+
 ## Kod tahlili
 
 Loyihaning batafsil kod tahlili va topilgan muammolar ro'yxati: [HISOBOT.md](HISOBOT.md).
