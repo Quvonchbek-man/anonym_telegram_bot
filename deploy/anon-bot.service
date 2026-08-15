@@ -1,0 +1,29 @@
+[Unit]
+Description=Anonim savol-javob boti (Telegram)
+# Tarmoq ko'tarilmasdan ishga tushsa, bot Telegramga ulana olmay xato beradi
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/anon-bot
+ExecStart=/opt/anon-bot/.venv/bin/python anon_bot.py
+
+# Polling uzilsa yoki protsess yiqilsa qayta ko'tariladi
+Restart=always
+RestartSec=5
+
+# Log'lar jurnalga: `journalctl -u anon-bot -f`
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
+
+# Oddiy himoya: yozish faqat baza turadigan papkaga ochiq
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/anon-bot
+
+[Install]
+WantedBy=multi-user.target
